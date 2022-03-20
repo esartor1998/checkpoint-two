@@ -1,0 +1,313 @@
+/*
+  Created by: Eric S & Theo O
+  File Name: cminus.cup
+  To Build: java java_cup.Main < cminus.cup
+*/
+   
+   
+/* ----------------------Preliminary Declarations Section--------------------*/
+   
+/* Import the class java_cup.runtime.*  */
+//import java_cup.runtime.*;
+import absyn.*;
+import java.util.List;
+
+/* Parser code to change the way the parser reports errors (include
+   line and column number of the error). */
+parser code {:
+	/* Change the method report_error so it will display the line and
+	   column of where the error occurred in the input as well as the
+	   reason for the error which is passed into the method in the
+	   String 'message'. */
+	
+	public String filename;
+	public List<String> args;
+	public boolean errors = false;
+
+	public parser(String filename, List<String> args, java_cup.runtime.Scanner s) {
+		super(s);
+		this.filename = filename;
+		this.args = args;
+	}
+
+	public void report_error(String message, Object info) {
+   
+		this.errors = true;
+
+		/* Create a StringBuffer called 'm' with the string 'Error' in it. */
+		StringBuffer m = new StringBuffer("Error");
+   
+		/* Check if the information passed to the method is the same
+		   type as the type java_cup.runtime.Symbol. */
+		if (info instanceof java_cup.runtime.Symbol) {
+			/* Declare a java_cup.runtime.Symbol object 's' with the
+			   information in the object info that is being typecasted
+			   as a java_cup.runtime.Symbol object. */
+			java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+   
+			/* Check if the line number in the input is greater or
+			   equal to zero. */
+			if (s.left >= 0) {                
+				/* Add to the end of the StringBuffer error message
+				   the line number of the error in the input. */
+				m.append(" in line "+(s.left+1));   
+				/* Check if the column number in the input is greater
+				   or equal to zero. */
+				if (s.right >= 0)                    
+					/* Add to the end of the StringBuffer error message
+					   the column number of the error in the input. */
+					m.append(", column "+(s.right+1));
+			}
+		}
+   
+		/* Add to the end of the StringBuffer error message created in
+		   this method the message that was passed into this method. */
+		m.append(" : "+message);
+   
+		/* Print the contents of the StringBuffer 'm', which contains
+		   an error message, out on a line. */
+		System.err.println(m);
+	}
+   
+	/* Change the method report_fatal_error so when it reports a fatal
+	   error it will display the line and column number of where the
+	   fatal error occurred in the input as well as the reason for the
+	   fatal error which is passed into the method in the object
+	   'message' and then exit.*/
+	public void report_fatal_error(String message, Object info) {
+		report_error(message, info);
+		if (info instanceof java_cup.runtime.Symbol) {
+			java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+			System.err.println("The erred symbol number is: " + s.toString());
+		}
+		System.exit(1);
+	}
+:};
+
+/* ------------Declaration of Terminals and Non Terminals Section----------- */
+   
+terminal IF, ELSE, WHILE, RETURN;                         //statements
+terminal LPAREN, RPAREN, LBRACE, RBRACE, LBRACK, RBRACK;  //brackets
+terminal NEQ, LEQ, GEQ, EQ, LT, GT;                       //relops
+terminal PLUS, MINUS, TIMES, OVER;                        //addop & mulop
+terminal INT, VOID;                                       //types
+terminal String ID, NUM;                                  //words
+terminal SEMI, ERROR, COMMA, ASSIGN;                      //other
+
+non terminal Integer operator;
+non terminal Type type; //needs sorting
+non terminal Var var;   //needs sorting
+non terminal Decl decl; //needs sorting
+non terminal FunctionDecl fun_decl;
+non terminal VarDecl param, var_decl; //var_decl -> simple/array
+non terminal DeclList program, decl_list;
+non terminal VarDeclList param_list, params, local_decl; //params pretty ambiguous
+non terminal BlockExpr block_stmt;
+non terminal CallExpr call;
+non terminal Expr simp_expr, factor, term; //these ones return other things all under "Expr"
+non terminal Expr expr, stmt, expr_stmt, iter_stmt, select_stmt, return_stmt;
+non terminal ExprList stmt_list, args, arg_list;
+
+precedence right ASSIGN; //reverse order lawl
+precedence nonassoc LT, GT, LEQ, GEQ, EQ, NEQ; //cant have a == b < c etc
+precedence left PLUS, MINUS;
+precedence left TIMES, OVER;
+precedence left ELSE, error; //SHOULD. GO . GFIRST?
+
+/* ----------------------------Grammar Section-------------------- */
+
+start with program;
+
+//the grammars... . .. .  they dont even need context!! they are "CONTEXT-FREE!"
+program ::= decl_list:d
+		{: RESULT = d; :}
+		| ERROR:e
+		{: RESULT = new DeclList(null, null); :}; //just a production
+type ::= INT:i
+		{: RESULT = new Type(new int[]{ileft, iright}, Type.INT); :}
+		| VOID:v
+		{: RESULT = new Type(new int[]{vleft, vright}, Type.VOID); :}; //the row,column are left,right rspctvly
+decl ::= var_decl:vd
+		{: RESULT = vd; :}
+		| fun_decl:fd
+		{: RESULT = fd; :}; //not the "end" of the production
+decl_list ::= decl_list:l decl:d
+		{: 
+		DeclList decls = l;
+		while (decls.tail != null) {
+			decls = decls.tail;
+		}
+		decls.tail = new DeclList(d, null);
+		RESULT = l;
+		:}
+		| decl:d
+		{: RESULT = new DeclList(d, null); :}
+		| error:e
+		{: parser.report_error("Syntax error within a declaration list; possibly recoverable", e); :};
+var_decl ::= type:t ID:v SEMI
+		{: RESULT = new SimpleDecl(new int[]{vleft, vright}, t, v); :}
+		| type:t ID:v LBRACK NUM:s RBRACK SEMI
+		{: RESULT = new ArrayDecl(new int[]{vleft, vright}, t, v, new IntExpr(new int[]{sleft, sright}, Integer.parseInt(s))); :}
+		| error:e ID:v LBRACK NUM:s RBRACK SEMI
+		{:
+		parser.report_error("Possible invalid type in array declaration! Assuming int, recovering.", e);
+		RESULT = new ArrayDecl(new int[]{eleft, eright}, new Type(new int[]{eleft, eright}, Type.INT),
+							   v, new IntExpr(new int[]{sleft, sright}, Integer.parseInt(s)));
+		:}
+		| error:e ID:v SEMI
+		{: 
+		parser.report_error("Possible invalid type in simple variable declaration! Assuming int, recovering.", e);
+		RESULT = new SimpleDecl(new int[]{eleft, eright}, new Type(new int[]{eleft, eright}, Type.INT), v); 
+		:}
+		| type:t type error:e ID:v SEMI
+		{: parser.report_error("Multiple types in declaration, assuming first was correct", e);
+		   RESULT = new SimpleDecl(new int[]{tleft, vright}, t, v); :};
+fun_decl ::= type:t ID:n LPAREN params:p RPAREN block_stmt:b
+		{: RESULT = new FunctionDecl(new int[]{nleft, nright}, t, n, p, b); :}
+		| type:t ID:n LPAREN error:e RPAREN block_stmt:b
+		{: parser.report_error("Invalid function parameters! Supplying with void and moving on...", e);
+		   RESULT = new FunctionDecl(new int[]{nleft, nright}, t, n, null, b); :};
+params ::= param_list:l 
+		{: RESULT = l; :}
+		| VOID:v
+		{: RESULT = null; :}; //in c this can also be ε (cant it?)
+param_list ::= param_list:l COMMA param:p
+		{:
+		VarDeclList plist = l;
+		while (plist.tail != null) {
+			plist = plist.tail;
+		}
+		plist.tail = new VarDeclList(p, null);
+		RESULT = l;
+		:}
+		| param:p
+		{: RESULT = new VarDeclList(p, null); :};
+param ::= type:t ID:v
+		{: RESULT = new SimpleDecl(new int[] {vleft, vright}, t, v); :}
+		| type:t ID:v LBRACK RBRACK
+		{: RESULT = new ArrayDecl(new int[]{vleft, vright}, t, v, null); :}; //need to fetch that ID later to get size?? ?
+local_decl ::= local_decl:l var_decl:v 
+		{:
+		if (l == null) {
+			RESULT = new VarDeclList(v, null);
+		}
+		else {
+			VarDeclList localdecls = l;
+			while (localdecls.tail != null) {
+				localdecls = localdecls.tail;
+			}
+			localdecls.tail = new VarDeclList(v, null);
+			RESULT = l;
+		}
+		:}
+		| 
+		{: RESULT = null; :}; //just nothing means ε apparently
+stmt_list ::= stmt_list:l stmt:s
+		{:
+		if (l == null) {
+			RESULT = new ExprList(s, null);
+		}
+		else {
+			ExprList stmts = l;
+			while (stmts.tail != null) {
+				stmts = stmts.tail;
+			}
+			stmts.tail = new ExprList(s, null);
+			RESULT = l;
+		}
+		:}
+		| 
+		{: RESULT = null; :}; //stmt_list stmt | stmt | ? 
+stmt ::= expr_stmt:e
+		{: RESULT = e; :}
+		| block_stmt:b
+		{: RESULT = b; :}
+		| select_stmt:s
+		{: RESULT = s; :}
+		| iter_stmt:i
+		{: RESULT = i; :}
+		| return_stmt:r
+		{: RESULT = r; :};
+expr_stmt ::= expr:e SEMI 
+		{: RESULT = e; :}
+		| SEMI:p
+		{: RESULT = new NilExpr(new int[] {pleft, pright}); :};
+select_stmt ::= IF:i LPAREN expr:e RPAREN stmt:t
+		{: RESULT = new IfExpr(new int[]{ileft, iright}, e, t, null); :}
+		| IF:i LPAREN expr:e RPAREN stmt:t ELSE stmt:o
+		{: RESULT = new IfExpr(new int[]{ileft, iright}, e, t, o); :};
+iter_stmt ::= WHILE:w LPAREN expr:e RPAREN stmt:t
+		{: RESULT = new WhileExpr(new int[]{wleft, wright}, e, t); :};
+return_stmt ::= RETURN:r expr:v SEMI
+		{: RESULT = new ReturnExpr(new int[]{rleft, rright}, v); :}
+		| RETURN:r SEMI
+		{: RESULT = new ReturnExpr(new int[]{rleft, rright}, null); :};
+block_stmt ::= LBRACE:st local_decl:l stmt_list:s RBRACE
+		{: RESULT = new BlockExpr(new int[]{stleft, stright}, l, s); :};
+expr ::= var:l ASSIGN expr:r 
+		{: RESULT = new AssignExpr(new int[]{lleft, lright}, l, r); :}
+		| var:l ASSIGN error:e
+		{: parser.report_error("Right side of assignment gone haywire! Oh no! Ignoring and continuing~", e); :}
+		| simp_expr:sex
+		{: RESULT = sex; :};
+var ::= ID:i
+		{: RESULT = new SimpleVar(new int[]{ileft, iright}, i); :}
+		| ID:i LBRACK expr:e RBRACK
+		{: RESULT = new IndexVar(new int[]{ileft, iright}, i, e); :};
+simp_expr ::= simp_expr:l LT simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.LT, r); :}
+		| simp_expr:l LEQ simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.LEQ, r); :}
+		| simp_expr:l GT simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.GT, r); :}
+		| simp_expr:l GEQ simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.GEQ, r); :}
+		| simp_expr:l EQ simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.EQ, r); :}
+		| simp_expr:l NEQ simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.NEQ, r); :}
+		| simp_expr:l PLUS simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.PLUS, r); :}
+		| simp_expr:l MINUS simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.MINUS, r); :}
+		| simp_expr:l TIMES simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.TIMES, r); :}
+		| simp_expr:l OVER simp_expr:r
+		{: RESULT = new OpExpr(new int[]{lleft, lright}, l, OpExpr.OVER, r); :}
+		| simp_expr:l error:e simp_expr:r
+		{: parser.report_error("Invalid operator in expression! Ignoring and moving on.", e); :}
+		| term:t
+		{: RESULT = t; :};
+term ::= term:t operator:m factor:f
+		{: RESULT = new OpExpr(new int[]{tleft, tright}, t, m, f); :}
+		| factor:f
+		{: RESULT = f; :};
+factor ::= LPAREN expr:e RPAREN
+		{: RESULT = e; :}
+		| var:v
+		{: RESULT = new VarExpr(new int[]{vleft, vright}, v); :}
+		| call:c
+		{: RESULT = c; :}
+		| NUM:n
+		{: RESULT = new IntExpr(new int[]{nleft, nright}, Integer.parseInt(n)); :}
+		| MINUS error:e NUM:n
+		{: parser.report_error("C- doesn't actually support negative numbers, despite having - in its name! 0 - n works, though", e); :};
+call ::= ID:i LPAREN args:a RPAREN
+		{: RESULT = new CallExpr(new int[]{ileft, iright}, i, a); :};
+args ::= arg_list:l
+		{: RESULT = l; :}
+		| 
+		{: RESULT = null; :};
+arg_list ::= arg_list:l COMMA expr:e
+		{:
+		ExprList arglist = l;
+		while(arglist.tail != null) {
+			arglist = arglist.tail;
+		}
+		arglist.tail = new ExprList(e, null);
+		RESULT = l;
+		:}
+		| arg_list:l COMMA error:e
+		{: parser.report_error("Error within argument list, ignoring erroneous argument expression and continuing", e); :}
+		| expr:e
+		{: RESULT = new ExprList(e, null); :};

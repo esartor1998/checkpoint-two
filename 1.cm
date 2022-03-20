@@ -1,0 +1,28 @@
+/* lcm in c-, nested function calls + "tricky" while*/
+
+int gcd(int m, int n) {
+	int tmp;
+	/* no modulo lol this wouldnt actually work. the / should be % */
+	while(m) { tmp = m; m = n / m; n = tmp; }
+	return n;
+}
+ 
+int lcm(int m, int n) {
+	return m / gcd(m, n) * n;
+}
+ 
+void main(void) {
+	int m; int n; int num; int lol;
+	/* language doesnt support strings so can't prompt user LOL */
+	m = input();
+	n = input();
+	output(m, n, lcm(m, n));
+
+	/* more testing */
+	if (5 + 2 * 3 - 7 >= 5 + 2 * (3 - 7)) {
+		lol = 5 - 3 * 4 / 7 + 6;
+		test[43] = lol;
+	}
+	num = output((input(test[44])));
+	if (a) if (b) f1(); else f2(); /*dangling else test*/
+}

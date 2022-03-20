@@ -1,0 +1,12 @@
+This submission is a complete lexer && parser combo with error recovery implemented, along with
+several test files which are intentionally broken [4-5].cm, and one that shows off how nice our
+parser is [1.cm].
+
+Eric Sartor  1000712
+Theo Oskroba 1068911
+
+Only -a is implemented, and usage of the flag is optional.
+
+To run (from the working directory /Cminusparser/):
+	make
+	java -cp /usr/share/java/cup.jar:. "CM" <-a> ../program.cm 

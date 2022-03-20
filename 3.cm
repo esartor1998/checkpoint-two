@@ -1,0 +1,33 @@
+/* leap year check in c-, mainly to see else if working and "complexer statements"*/
+/* also doable without a mod operator LOL */
+void f1(void) {
+	output(0);
+}
+
+void f2(void) {
+	output(1);
+}
+
+void main(void) {
+	int year; char fence1; char endfences; char fence3[2];
+	year = input();
+
+	/* leap year if perfectly divisible by 400 */
+	if (year / 400 == 1) {
+		output(1);
+	}
+	/* not a leap year if divisible by 100
+	   but not divisible by 400*/
+	else if (year / 100 == 1) {
+		output(0);
+	}
+	/* leap year if not divisible by 100
+	   but divisible by 4*/
+	else if (year / 4 == 1) {
+		output(1);
+	}
+	/* all other years are not leap years */
+	else { 
+		output(0);
+	}
+}

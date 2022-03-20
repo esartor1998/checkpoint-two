@@ -1,0 +1,15 @@
+/* pyramid printing in c-, nested loops */
+
+void main(void) {
+	int i; int j; int newline; int rows;
+	i = 1; j = -1; newline = 10;
+	rows = input();
+	while (i <= rows) {
+		i = i - 1;
+		while (j <= i) {
+			j = j + 1;
+			output(8);
+		} /* cant actually newline because the language doesnt support it LOL*/
+		output(newline);
+	}
+}

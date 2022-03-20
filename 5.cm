@@ -1,0 +1,13 @@
+/*just tryna be nasty ig*/
+void main(void)	{
+	int int er; int test[-45];
+	int lol;
+	if (5 + 2 * 3 - 7 >= 5 + 2 * (3 - 7)) {
+		lol = 128!;
+		test[43] = lol;
+	}
+	negative[69] = -2;
+	num = output((input(test44])));
+	if (a) if (b) f1(); else f2(); /*dangling else test*/
+	/*lol!*/
+}
