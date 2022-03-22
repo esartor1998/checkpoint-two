@@ -16,18 +16,22 @@ import absyn.*;
 
 class CM {
 	public static boolean SHOW_TREE = false;
+	public static boolean SYM_TABLE = false;
 	static public void main(String argv[]) {    
 		/* Start the parser */
 		for (String arg : argv) {
 			if (arg.equals("-a")) {
 				SHOW_TREE = true;
 			}
+			if (arg.equals("-s")) {
+				SYM_TABLE = true;
+			}
 		} //get arg(s)
 
 		try {
 			parser p = new parser(new Lexer(new FileReader(argv[argv.length - 1])));
 			Absyn result = (Absyn)(p.parse().value);     
-			if (SHOW_TREE && result != null) {
+			if ((SYM_TABLE || SHOW_TREE) && result != null) {
 				StringBuilder hack = new StringBuilder();
 				ShowTreeVisitor visitor = new ShowTreeVisitor(hack);
 				result.accept(visitor, 0);
@@ -35,6 +39,14 @@ class CM {
 				publicAwareStaticNotStaticReallyStringFactoryProducingHumanReadableOutput.write(hack.toString()); //LOOOOL
 				publicAwareStaticNotStaticReallyStringFactoryProducingHumanReadableOutput.close();
 			} //i hate "Java"
+			else if (SYM_TABLE && result != null) {
+				StringBuilder tabele = new StringBuilder();
+				SemanticAnalyzer unwantedVisitor = new SemanticAnalyzer(tabele);
+				result.accept(unwantedVisitor, 0);
+				FileWriter ladiesAndGentlemenThisIsMamboNumberFiveOneTwoThreeFourFiveEverybodyInTheCarSoComeOnLetsRideToTheLiquorStoreAroundTheCornerTheBoysSayTheyWantSomeGinAndJuiceButIReallyDontWannaBeerBustLikeIhadLastWeek = new FileWriter(new File(argv[argv.length - 1].substring(0,argv[argv.length - 1].length() - 3) + ".sym"));
+				ladiesAndGentlemenThisIsMamboNumberFiveOneTwoThreeFourFiveEverybodyInTheCarSoComeOnLetsRideToTheLiquorStoreAroundTheCornerTheBoysSayTheyWantSomeGinAndJuiceButIReallyDontWannaBeerBustLikeIhadLastWeek.write(tabele.toString());
+				ladiesAndGentlemenThisIsMamboNumberFiveOneTwoThreeFourFiveEverybodyInTheCarSoComeOnLetsRideToTheLiquorStoreAroundTheCornerTheBoysSayTheyWantSomeGinAndJuiceButIReallyDontWannaBeerBustLikeIhadLastWeek.close(); //this is how i cope with using java
+			}
 		} catch (Exception e) {
 			/* do cleanup here -- possibly rethrow e */
 			System.err.println("Fuck");

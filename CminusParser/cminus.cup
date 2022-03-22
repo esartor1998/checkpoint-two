@@ -185,7 +185,7 @@ param_list ::= param_list:l COMMA param:p
 param ::= type:t ID:v
 		{: RESULT = new SimpleDecl(new int[] {vleft, vright}, t, v); :}
 		| type:t ID:v LBRACK RBRACK
-		{: RESULT = new ArrayDecl(new int[]{vleft, vright}, t, v, null); :}; //need to fetch that ID later to get size?? ?
+		{: RESULT = new ArrayDecl(new int[]{vleft, vright}, t, v, null); :}; //ok fr how are we supposed to know the size
 local_decl ::= local_decl:l var_decl:v 
 		{:
 		if (l == null) {
