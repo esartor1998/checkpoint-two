@@ -20,18 +20,26 @@ class CM {
 	static public void main(String argv[]) {    
 		/* Start the parser */
 		for (String arg : argv) {
-			if (arg.equals("-a")) {
-				SHOW_TREE = true;
-			}
 			if (arg.equals("-s")) {
+				System.out.println("Creating AST & symbol table");
 				SYM_TABLE = true;
+				SHOW_TREE = true;
+				break;
+			}
+			else if (arg.equals("-a")) {
+				System.out.println("Creating AST");
+				SHOW_TREE = true;
+				break;
 			}
 		} //get arg(s)
-
 		try {
 			parser p = new parser(new Lexer(new FileReader(argv[argv.length - 1])));
-			Absyn result = (Absyn)(p.parse().value);     
-			if ((SYM_TABLE || SHOW_TREE) && result != null) {
+			Absyn result = (Absyn)(p.parse().value);
+			System.out.println("ra ra ra-a-a!\n"+Boolean.toString(SYM_TABLE) + " " + result.toString());
+			if (result == null) {
+				System.out.println("WHY are you nulling");
+			}
+			if (SHOW_TREE && result != null) {
 				StringBuilder hack = new StringBuilder();
 				ShowTreeVisitor visitor = new ShowTreeVisitor(hack);
 				result.accept(visitor, 0);
@@ -39,7 +47,8 @@ class CM {
 				publicAwareStaticNotStaticReallyStringFactoryProducingHumanReadableOutput.write(hack.toString()); //LOOOOL
 				publicAwareStaticNotStaticReallyStringFactoryProducingHumanReadableOutput.close();
 			} //i hate "Java"
-			else if (SYM_TABLE && result != null) {
+			if (SYM_TABLE && result != null) {
+				System.out.println("roma, roma-ma");
 				StringBuilder tabele = new StringBuilder();
 				SemanticAnalyzer unwantedVisitor = new SemanticAnalyzer(tabele);
 				result.accept(unwantedVisitor, 0);

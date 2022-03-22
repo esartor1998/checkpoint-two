@@ -75,14 +75,17 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(AssignExpr expr, int level) {
-		expr.lhs.accept(this, level);
-		expr.rhs.accept(this, level);
+		if (expr.lhs != null) expr.lhs.accept(this, level);
+		if (expr.rhs != null) expr.rhs.accept(this, level);
 		//TODO: error checking
 	}
 
 	public void visit(IfExpr expr, int level) {
 		expr.test.accept(this, level);
-		expr.thenpart.accept(this, level); //TODO: needs error checking
+		expr.thenpart.accept(this, level);
+		if (expr.elsepart != null) {
+			expr.elsepart.accept(this, level);
+		}
 	}
 
 	public void visit(WhileExpr expr, int level) {
@@ -99,7 +102,6 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		if (expr.decls != null || expr.exprs != null) {
 			level++;
 		} //we scopin. 
-
 		if (expr.decls != null) {
 			expr.decls.accept(this, level);
 		}
@@ -112,10 +114,19 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		this.table.forEach((k, v) -> {
 			v.forEach((node) -> {
 				if (node.level == currentLevel) {
-					if (node.def instanceof SimpleDecl) {
-						indent(currentLevel); //no need for janky downcasting because theres no exlusive fields/methods in SimpleDecl
-						builder.append(node.name + ": " + node.def.type.getTypeName() + "\n");
-						//but really, should only be an integer, so...
+					if (node.def instanceof FunctionDecl) {
+						FunctionDecl javasucks = (FunctionDecl)(node.def);
+						indent(currentLevel);
+						StringBuilder paramMaker = new StringBuilder();
+						VarDeclList p = javasucks.params;
+						while(p != null) {
+							if (p.head != null) {
+								paramMaker.append(p.head.type.getTypeName() + ", ");
+							}
+							p = p.tail;
+						}
+						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - 2, 0)); //to remove the extra ", " but not provide substring with a bad arg
+						builder.append(node.name + ": (" + paramTypes + ") ->" + javasucks.result.getTypeName() + "\n");
 					}
 					else if (node.def instanceof ArrayDecl) {
 						ArrayDecl javabad = (ArrayDecl)(node.def);
@@ -128,21 +139,14 @@ public class SemanticAnalyzer implements AbsynVisitor {
 							sizeStr = Integer.toString(javabad.size.value);
 						}
 						builder.append(node.name + "[" + sizeStr + "]: " + javabad.type.getTypeName() + "\n"); //FIXME: uh?
-						//should only be an integer really, as i said before, but hehehehehehehe
+						//should only be an integer really, but hehehehehehehe
 					}
-					else if (node.def instanceof FunctionDecl) {
-						FunctionDecl javasucks = (FunctionDecl)(node.def);
+					else if (node.def instanceof SimpleDecl) {
 						indent(currentLevel);
-						StringBuilder paramMaker = new StringBuilder();
-						VarDeclList p = javasucks.params;
-						while(p != null) {
-							if (p.head != null) {
-								paramMaker.append(p.head.type.getTypeName() + ", ");
-							}
-							p = p.tail;
-						}
-						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - 2, 0)); //to remove the extra ", " but provide substring with a bad arg
-						builder.append(node.name + ": (" + paramTypes + ") ->" + javasucks.result.getTypeName() + "\n");
+						SimpleDecl javajank = (SimpleDecl)(node.def); //still need to downcast because fuck me ig
+						System.out.println(Integer.toString(javajank.row) + ", " + Integer.toString(javajank.column));
+						builder.append(node.name + ": " + javajank.type.getTypeName() + "\n");
+						//but really, should only be an integer, so...
 					}
 					else {
 						System.err.println("The definition of node " + node.name + " is invalid or empty!");
@@ -155,11 +159,16 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(ReturnExpr expr, int level) {
+		if (expr.expr != null) {
+			expr.expr.accept(this, level);
+		}
 		//TODO: error checking (lots)
 	}
 
 	public void visit(CallExpr expr, int level) {
-		expr.args.accept(this, level);
+		if (expr.args != null) {
+			expr.args.accept(this, level);
+		}
 		//level++? here? no... cuz a function has a blockscope, right?
 		//anyways too bad the inheritance is fucked so i cant do a nice get from table
 		ArrayList lawl = this.table.get(expr.func);
@@ -195,6 +204,12 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	public void visit(FunctionDecl expr, int level) { //this mfer got some params n shit ig
 		NodeType thisNode = new NodeType(expr.name, expr, level);
 		push(thisNode);
+		if (expr.params != null) {
+			expr.params.accept(this, level);
+		}
+		if (expr.body != null){
+			expr.body.accept(this, level);
+		}
 		//TODO: type and err checking.
 	}
 
