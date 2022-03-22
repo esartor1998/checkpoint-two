@@ -22,4 +22,4 @@ parser.java: cminus.cup
 	$(CUP) -expect 0 cminus.cup
 
 clean:
-	rm -f parser.java Lexer.java sym.java *.class absyn/*.class *~ ../*.abs
+	rm -f parser.java Lexer.java sym.java *.class absyn/*.class *~ ../*.abs ../*.sym

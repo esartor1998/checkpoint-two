@@ -2,10 +2,7 @@ import absyn.*;
 
 import java.util.HashMap;
 import java.util.ArrayList;
-
-/*
-indent(level);
-builder.append(expr.name + ": " + node.def.type.getTypeName() + "\n");*/
+import java.util.concurrent.atomic.AtomicInteger; //hate
 
 public class SemanticAnalyzer implements AbsynVisitor {
 
@@ -99,38 +96,46 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(BlockExpr expr, int level) {
-		if (expr.decls != null || expr.exprs != null) {
-			level++;
-		} //we scopin. 
+		//level++; //we scopin
 		if (expr.decls != null) {
 			expr.decls.accept(this, level);
 		}
 		if (expr.exprs != null) {
 			expr.exprs.accept(this, level);
 		}
-
+		//level--;
 		//print all the relevant table info here because we have reached the end of the scope?
-		final int currentLevel = level;
+		AtomicInteger currentLevel = new AtomicInteger(level);
 		this.table.forEach((k, v) -> {
 			v.forEach((node) -> {
-				if (node.level == currentLevel) {
+				System.out.println("nodelevel: " + Integer.toString(node.level) + "vs currentLevel: " + Integer.toString(currentLevel.get())); 
+				if (node.level == currentLevel.get()) {
 					if (node.def instanceof FunctionDecl) {
 						FunctionDecl javasucks = (FunctionDecl)(node.def);
-						indent(currentLevel);
+						indent(currentLevel.get());
 						StringBuilder paramMaker = new StringBuilder();
 						VarDeclList p = javasucks.params;
+						VarDecl endingone = new SimpleDecl(new int[]{99969, 999420}, null, null); //i dont care any more
 						while(p != null) {
 							if (p.head != null) {
-								paramMaker.append(p.head.type.getTypeName() + ", ");
+								endingone = p.head;
+								if (p.head instanceof ArrayDecl) {
+									ArrayDecl downcastingMeme = (ArrayDecl)(p.head);
+									paramMaker.append(downcastingMeme.type.getTypeName() + "[], ");
+								}
+								else {
+									SimpleDecl romaRomama = (SimpleDecl)(p.head);
+									paramMaker.append(romaRomama.type.getTypeName() + ", "); //FIXME: fuck it varies in length depending
+								}
 							}
 							p = p.tail;
 						}
-						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - 2, 0)); //to remove the extra ", " but not provide substring with a bad arg
-						builder.append(node.name + ": (" + paramTypes + ") ->" + javasucks.result.getTypeName() + "\n");
+						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - ((endingone instanceof SimpleDecl) ? 2 : 4), 0)); //to remove the extra ", " but not provide substring with a bad arg
+						this.builder.append(Integer.toString(node.level) + " | " + node.name + ": (" + paramTypes + ") -> " + javasucks.result.getTypeName() + "\n");
 					}
 					else if (node.def instanceof ArrayDecl) {
 						ArrayDecl javabad = (ArrayDecl)(node.def);
-						indent(currentLevel);
+						indent(currentLevel.get());
 						String sizeStr;
 						if (javabad.size == null) {
 							sizeStr = "";
@@ -138,14 +143,14 @@ public class SemanticAnalyzer implements AbsynVisitor {
 						else {
 							sizeStr = Integer.toString(javabad.size.value);
 						}
-						builder.append(node.name + "[" + sizeStr + "]: " + javabad.type.getTypeName() + "\n"); //FIXME: uh?
+						this.builder.append(Integer.toString(node.level) + " | " + node.name + "[" + sizeStr + "]: " + javabad.type.getTypeName() + "\n"); //FIXME: uh?
 						//should only be an integer really, but hehehehehehehe
 					}
 					else if (node.def instanceof SimpleDecl) {
-						indent(currentLevel);
+						indent(currentLevel.get());
 						SimpleDecl javajank = (SimpleDecl)(node.def); //still need to downcast because fuck me ig
 						System.out.println(Integer.toString(javajank.row) + ", " + Integer.toString(javajank.column));
-						builder.append(node.name + ": " + javajank.type.getTypeName() + "\n");
+						this.builder.append(Integer.toString(node.level) + " | " + node.name + ": " + javajank.type.getTypeName() + "\n");
 						//but really, should only be an integer, so...
 					}
 					else {
@@ -155,6 +160,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 				}
 			});
 		});
+
 		level--;
 	}
 
