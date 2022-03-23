@@ -73,7 +73,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		} //thats why i named this variable "scuffed". thank u so much for this horrid plan
 	}
 
-	private void analyze(int currentLevel) {
+	private void analyze(int currentLevel) { //is this what you wanted fei. is this what you wanted your students to go through?
 		Iterator<ArrayList<NodeType>> hashMapIterator = this.table.values().iterator();
 		while(hashMapIterator.hasNext()) {
 			boolean toRemove = false;
@@ -164,8 +164,8 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			expr = expr.tail;
 		}
 		level = declevel(level);
-		analyze(level);
 		testindent(level, "Exiting the global scope");
+		//analyze(level);
 	}
 
 	public void visit(VarExpr expr, int level) {
@@ -206,15 +206,15 @@ public class SemanticAnalyzer implements AbsynVisitor {
 
 	public void visit(BlockExpr expr, int level) { //a nice toString override could REALLY simplify this code but I'm strictly following fei song's advice for the meme
 		if (expr.exprs != null || expr.decls != null) {
-			testindent(level, "Entering a block");
-			level = inclevel(level);
+			//testindent(level, "Entering a block");
+			//level = inclevel(level);
 			if (expr.decls != null)
 				expr.decls.accept(this, level);
 			if (expr.exprs != null)
 				expr.exprs.accept(this, level);
-			level = declevel(level);
+			//level = declevel(level);
+			//testindent(level, "Leaving a block");
 			analyze(level);
-			testindent(level, "Leaving a block");
 		}
 		//print all the relevant table info here because we have reached the end of the scope
 	}
@@ -271,8 +271,8 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			}
 			expr.body.accept(this, level);
 			level = declevel(level);
-			analyze(level);
 			testindent(level, "Leaving function scope (" + expr.name + ")");
+			analyze(level);
 		}
 		//TODO: type and err checking.
 	}
