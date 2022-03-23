@@ -10,6 +10,11 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	final static int SIMPLE = 0;
 	final static int ARRAY = 1;
 	final static int FUNCTION = 2;
+
+	final static int NOTFOUND = -1;
+	final static int REDEFIND = 0; //on redefined
+	final static int VERIFIED = 1;
+
 	public HashMap<String, ArrayList<NodeType>> table;
 	public static StringBuilder builder;
 
@@ -36,6 +41,8 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		this.table.put("input", inputForTable);
 		this.table.put("output", outputForTable);
 	}
+
+	public ArrayList<String> pain = new ArrayList<String>();
 
 	private int inclevel(int level) {
 		//testindent(level, "increasing level from " + Integer.toString(level));
@@ -105,7 +112,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 							p = p.tail;
 						}
 						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - ((endingone instanceof SimpleDecl) ? 2 : 4), 0)); //to remove the extra ", " but not provide substring with a bad arg
-						testindent(currentLevel, node.name + ": (" + paramTypes + ") -> " + javasucks.result.getTypeName());
+						pain.add(node.name + ": (" + paramTypes + ") -> " + javasucks.result.getTypeName());
 					}
 					else if (node.def instanceof ArrayDecl) {
 						ArrayDecl javabad = (ArrayDecl)(node.def);
@@ -162,6 +169,11 @@ public class SemanticAnalyzer implements AbsynVisitor {
 				expr.head.accept(this, level);
 			}
 			expr = expr.tail;
+		}
+		Iterator<String> lmfao = pain.iterator();
+		while (lmfao.hasNext()) {
+			String xdxd = lmfao.next();
+			testindent(level, xdxd);
 		}
 		level = declevel(level);
 		testindent(level, "Exiting the global scope");
@@ -230,13 +242,6 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		if (expr.args != null) {
 			expr.args.accept(this, level);
 		}
-		ArrayList lawl = this.table.get(expr.func);
-		if (lawl == null) {
-			//TODO: handle undef, param mismatch, etc
-		} else {
-			//NodeType jank = (NodeType)lawl.get(0); //since function redefintions arent allowed, just take the first one.
-			//check assign etc
-		}
 		//TODO: this. this is a biggie with many error cases
 	}
 	
@@ -277,14 +282,103 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		//TODO: type and err checking.
 	}
 
+	private static int ERRNOTFOUND(int row, int col, String offending) {
+		System.err.println("Error on " + Integer.toString(row) + ", " + Integer.toString(col) + ": " + offending + " not found or inaccessible.");
+		return NOTFOUND;
+	}
+
+	private static int ERRREDEFINED(int row, int col, String offending) {
+		System.err.println("Error on " + Integer.toString(row) + ", " + Integer.toString(col) + ": " + offending + " redefined in an identical scope.");
+		return NOTFOUND;
+	}
+
+	private int determineExistence(Var id) {
+		if (id instanceof SimpleVar) {
+			SimpleVar fuck = (SimpleVar)id;
+			ArrayList<NodeType> tmp = this.table.get(fuck.name);
+			if (tmp == null) return ERRNOTFOUND(fuck.row, fuck.column, fuck.name);
+			else { //this is so hilariously extra. god i hate this lang
+				NodeType match = tmp.stream().filter(e -> e.name.equals(fuck.name)).findFirst().orElse(null);
+				if (match == null) return ERRNOTFOUND(fuck.row, fuck.column, fuck.name);
+				else return VERIFIED;
+			}
+		}
+		else {
+			IndexVar life = (IndexVar)id;
+			ArrayList<NodeType> tmp = this.table.get(life.name);
+			if (tmp == null) return ERRNOTFOUND(life.row, life.column, life.name);
+			else { //this is so hilariously extra. god i hate this lang
+				NodeType match = tmp.stream().filter(e -> e.name.equals(life.name)).findFirst().orElse(null);
+				if (match == null) return ERRNOTFOUND(life.row, life.column, life.name);
+				else return VERIFIED;
+			}
+		} //instanceofinstanceofinstanceofinstanceofinstanceofinstanceofinstanceofinstanceofinstanceof
+	}
+
+	private int determineRedefinition(Var id, int level) {
+		int test = determineExistence(id);
+		if (test != NOTFOUND) {
+			ArrayList<NodeType> tmp = this.table.get(id.name);
+			if (tmp != null) {
+				ArrayList<Integer> scopes = new ArrayList<Integer>();
+				Iterator<NodeType> iter = tmp.iterator();
+				while(iter.hasNext()) {
+					NodeType curr = iter.next();
+					if (scopes.contains(curr.level)) return ERRREDEFINED(id.row, id.column, id.name);
+				}
+				return VERIFIED;
+			}
+			else return NOTFOUND;
+		} else return test; //this is the worst code i've ever written in my life and i'm blaming fei song
+	}
 
 	public void visit(SimpleVar expr, int level) {
 		//TODO: type checking and error checking. check if it is in the lookup table
+		if (expr != null) {
+			determineRedefinition(expr, level);
+		}
+	}
+
+	private boolean checkIndex(Expr expr) {
+		if (expr instanceof IntExpr) {
+			return true;
+		}
+		else if (expr instanceof VarExpr) {
+			VarExpr haha = (VarExpr)expr;
+			ArrayList<NodeType> god = this.table.get(haha.variable.name);
+			NodeType doubleErrSkeetAroundUsingDetermineExistence = null;
+			if (god != null) doubleErrSkeetAroundUsingDetermineExistence = god.stream().filter(e -> e.name.equals(haha.variable.name)).findFirst().orElse(null);
+			if (doubleErrSkeetAroundUsingDetermineExistence != null) {
+				return true;
+			}
+			else return false;
+		}
+		else if (expr instanceof CallExpr) {
+			String name = ((CallExpr)expr).func;
+			ArrayList<NodeType> god = this.table.get(name);
+			NodeType jankYe = null;
+			if (god != null) jankYe = god.stream().filter(e -> e.name.equals(name)).findFirst().orElse(null);
+			if (jankYe == null) { //NOTE: could probably have used determineexistence but it 5am idrc
+				ERRNOTFOUND(((CallExpr)expr).row, ((CallExpr)expr).column, name);
+				return false;
+			}
+			else {
+				return jankYe.def.type.type == Type.INT;
+			}
+		}
+		else if (expr instanceof OpExpr) {
+			return checkIndex(((OpExpr)expr).left) && checkIndex(((OpExpr)expr).right);
+		}
+		return false;
 	}
 
 	public void visit(IndexVar expr, int level) { //printing the size of the array will be a fuckfest
-		expr.index.accept(this, level);
 		//TODO: type echecking and error checking
+		int isntRedef = determineRedefinition(expr, level);
+		if (expr.index != null) {
+			checkIndex(expr.index);
+			expr.index.accept(this, level);
+		}
 	}
 
 	public void visit(Type expr, int level) {
