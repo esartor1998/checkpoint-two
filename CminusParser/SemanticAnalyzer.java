@@ -15,6 +15,8 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	final static int REDEFIND = 0; //on redefined
 	final static int VERIFIED = 1;
 
+	public boolean hasReturned = false;
+	public Type functionType = null; //to figure out if we're in a function, and what return type it should have
 	public HashMap<String, ArrayList<NodeType>> table;
 	public static StringBuilder builder;
 
@@ -23,17 +25,17 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		this.builder = lol; 								     //OOOHHHH IM VISITINGGGGG
 		int[] startOfProg = {0, 0};
 		NodeType inputNode = new NodeType("input", 
-												new FunctionDecl(startOfProg, 
-													new Type(startOfProg, Type.INT), "input",
-														new VarDeclList(null, null),
-													new BlockExpr(startOfProg, null, null)),
-													0);
+			new FunctionDecl(startOfProg, 
+				new Type(startOfProg, Type.INT), "input",
+					new VarDeclList(null, null),
+				new BlockExpr(startOfProg, null, null)),
+			0);
 		NodeType outputNode = new NodeType("output", 
-												new FunctionDecl(startOfProg, 
-													new Type(startOfProg, Type.VOID), "output", 
-														new VarDeclList(new SimpleDecl(startOfProg, new Type(startOfProg, Type.INT), "x"), null), 
-													new BlockExpr(startOfProg, null, null)),
-													0);
+			new FunctionDecl(startOfProg, 
+				new Type(startOfProg, Type.VOID), "output", 
+					new VarDeclList(new SimpleDecl(startOfProg, new Type(startOfProg, Type.INT), "x"), null), 
+				new BlockExpr(startOfProg, null, null)),
+			0);
 		ArrayList<NodeType> inputForTable = new ArrayList<NodeType>();
 		ArrayList<NodeType> outputForTable = new ArrayList<NodeType>();
 		inputForTable.add(inputNode);
@@ -43,6 +45,10 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public ArrayList<String> pain = new ArrayList<String>();
+
+	private void printerr(int row, int col, String msg) {
+		System.err.println("Error on line " + Integer.toString(row) + ", col " + Integer.toString(col) + ": " + msg);
+	}
 
 	private int inclevel(int level) {
 		//testindent(level, "increasing level from " + Integer.toString(level));
@@ -235,34 +241,57 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		if (expr.expr != null) {
 			expr.expr.accept(this, level);
 		}
-		//TODO: error checking (lots)
+		if (functionType == null) {
+			printerr(expr.row, expr.column, "return statement outside function");
+		}
+		else if (functionType.type != Type.INT) {
+			printerr(expr.row, expr.column, "return statement inside void function");
+		} //and i guess we dont have to check if the return type matches cuz theres only two types 💀
 	}
 
 	public void visit(CallExpr expr, int level) {
+		int countedArgs = 0;
+		ExprList arglist = expr.args;
+		ArrayList<NodeType> fsong = this.table.get(expr.name);
+		if (fsong != null) {
+			FunctionDecl def = fsong.stream().filter(e -> e.name.equals(fsong.name)).findFirst().orElse(null);
+			while(arglist != null) {
+				if (arglist.head != null) {
+					countedArgs += 1;
+				}
+				arglist = arglist.tail;
+			} //TODO: check param count and function existence
+		else {
+			printerr(expr.row, expr.column, "function " + expr.name + " is not defined")
+		}
 		if (expr.args != null) {
 			expr.args.accept(this, level);
 		}
-		//TODO: this. this is a biggie with many error cases
 	}
 	
-	public void visit(NilExpr expr, int level) {
-		//when the expr is Nil
-	}
 
-	public void visit(IntExpr expr, int level) {
-		//when the expr is Int
-	}
 
 	public void visit(SimpleDecl expr, int level) {
+		if (expr.type.type == Type.VOID) {
+			printerr(expr.row, expr.column, "void type variable declaration. Changing to int");
+			expr.type.type = Type.INT;
+		}
 		NodeType thisNode = new NodeType(expr.name, expr, level);
 		push(thisNode);
-		//TODO: type and error? checking
 	}
 
 	public void visit(ArrayDecl expr, int level) {
+		if (expr.type.type == Type.VOID) {
+			printerr(expr.row, expr.column, "void type array declaration. Changing to int");
+			expr.type.type = Type.INT;
+		}
+		//if (checkIndex()); nvm on second thought no need to check index resolves to int cuz its forced to be by syntax
+		if (expr.size.value <= 0) {
+			printerr(expr.row, expr.column, "invalid size for array, changing to 1");
+			expr.size.value = 1;
+		}
 		NodeType thisNode = new NodeType(expr.name, expr, level);
 		push(thisNode);
-		//TODO: type and error checking. note the thing he says ab void in the guidelines
 	}
 
 	public void visit(FunctionDecl expr, int level) { //this mfer got some params n shit ig
@@ -270,11 +299,17 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		push(thisNode);
 		if (expr.body != null){
 			testindent(level, "Entering function scope (" + expr.name + ")");
+			functionType = expr.result;
+			hasReturned = false;
 			level = inclevel(level);
 			if (expr.params != null) {
 				expr.params.accept(this, level);
 			}
 			expr.body.accept(this, level);
+			functionType = null;
+			if (!hasReturned && expr.result.type.type == Type.INT) {
+				printerr(expr.row, expr.column, "integer-promising function missing a return value");
+			}
 			level = declevel(level);
 			testindent(level, "Leaving function scope (" + expr.name + ")");
 			analyze(level);
@@ -282,13 +317,13 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		//TODO: type and err checking.
 	}
 
-	private static int ERRNOTFOUND(int row, int col, String offending) {
-		System.err.println("Error on " + Integer.toString(row) + ", " + Integer.toString(col) + ": " + offending + " not found or inaccessible.");
+	private int ERRNOTFOUND(int row, int col, String offending) {
+		printerr(row, col, "var or function " + offending + " not found or inaccessible.");
 		return NOTFOUND;
 	}
 
-	private static int ERRREDEFINED(int row, int col, String offending) {
-		System.err.println("Error on " + Integer.toString(row) + ", " + Integer.toString(col) + ": " + offending + " redefined in an identical scope.");
+	private int ERRREDEFINED(int row, int col, String offending) {
+		printerr(row, col, "var or function " + offending + " redefined in an identical scope");
 		return NOTFOUND;
 	}
 
@@ -333,7 +368,6 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(SimpleVar expr, int level) {
-		//TODO: type checking and error checking. check if it is in the lookup table
 		if (expr != null) {
 			determineRedefinition(expr, level);
 		}
@@ -373,15 +407,24 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(IndexVar expr, int level) { //printing the size of the array will be a fuckfest
-		//TODO: type echecking and error checking
 		int isntRedef = determineRedefinition(expr, level);
 		if (expr.index != null) {
-			checkIndex(expr.index);
+			if(!checkIndex(expr.index)) {
+				printerr(expr.row, expr.column, "non-integer-resolving array dereference");
+			}
 			expr.index.accept(this, level);
 		}
 	}
 
 	public void visit(Type expr, int level) {
 		//when the superclass is abstract
+	}
+	
+	public void visit(NilExpr expr, int level) {
+		//when the expr is Nil
+	}
+
+	public void visit(IntExpr expr, int level) {
+		//when the expr is Int
 	}
 }
