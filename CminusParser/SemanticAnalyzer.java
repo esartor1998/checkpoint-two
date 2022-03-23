@@ -44,7 +44,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		this.table.put("output", outputForTable);
 	}
 
-	public ArrayList<String> pain = new ArrayList<String>();
+	public HashMap<String, FunctionDecl> pain = new HashMap<String, FunctionDecl>();
 
 	private void printerr(int row, int col, String msg) {
 		System.err.println("Error on line " + Integer.toString(row) + ", col " + Integer.toString(col) + ": " + msg);
@@ -100,25 +100,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 					toRemove = true;
 					if (node.def instanceof FunctionDecl) {
 						FunctionDecl javasucks = (FunctionDecl)(node.def);
-						StringBuilder paramMaker = new StringBuilder();
-						VarDeclList p = javasucks.params;
-						VarDecl endingone = new SimpleDecl(new int[]{99969, 999420}, null, null); //i dont care any more
-						while(p != null) {
-							if (p.head != null) {
-								endingone = p.head;
-								if (p.head instanceof ArrayDecl) {
-									ArrayDecl downcastingMeme = (ArrayDecl)(p.head);
-									paramMaker.append(downcastingMeme.type.getTypeName() + "[], ");
-								}
-								else {
-									SimpleDecl romaRomama = (SimpleDecl)(p.head);
-									paramMaker.append(romaRomama.type.getTypeName() + ", ");
-								}
-							}
-							p = p.tail;
-						}
-						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - ((endingone instanceof SimpleDecl) ? 2 : 4), 0)); //to remove the extra ", " but not provide substring with a bad arg
-						pain.add(node.name + ": (" + paramTypes + ") -> " + javasucks.result.getTypeName());
+						pain.put(node.name, javasucks);
 					}
 					else if (node.def instanceof ArrayDecl) {
 						ArrayDecl javabad = (ArrayDecl)(node.def);
@@ -176,10 +158,29 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			}
 			expr = expr.tail;
 		}
-		Iterator<String> lmfao = pain.iterator();
+		Iterator<FunctionDecl> lmfao = pain.values().iterator();
 		while (lmfao.hasNext()) {
-			String xdxd = lmfao.next();
-			testindent(level, xdxd);
+			FunctionDecl func = lmfao.next();
+			StringBuilder paramMaker = new StringBuilder();
+						VarDeclList p = func.params;
+						VarDecl endingone = new SimpleDecl(new int[]{99969, 999420}, null, null); //i dont care any more
+						while(p != null) {
+							if (p.head != null) {
+								endingone = p.head;
+								if (p.head instanceof ArrayDecl) {
+									ArrayDecl downcastingMeme = (ArrayDecl)(p.head);
+									paramMaker.append(downcastingMeme.type.getTypeName() + "[], ");
+								}
+								else {
+									SimpleDecl romaRomama = (SimpleDecl)(p.head);
+									paramMaker.append(romaRomama.type.getTypeName() + ", ");
+								}
+							}
+							p = p.tail;
+						}
+						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - ((endingone instanceof SimpleDecl) ? 2 : 4), 0)); //to remove the extra ", " but not provide substring with a bad arg
+						
+			testindent(level, func.name + ": (" + paramTypes + ") -> " + func.result.getTypeName());
 		}
 		level = declevel(level);
 		testindent(level, "Exiting the global scope");
@@ -200,8 +201,10 @@ public class SemanticAnalyzer implements AbsynVisitor {
 
 	public void visit(AssignExpr expr, int level) {
 		if (expr.lhs != null) expr.lhs.accept(this, level);
+		if (!checkIndex(expr.rhs)) {
+			printerr(expr.row, expr.column, "value to be assigned is not integer-resolving");
+		}
 		if (expr.rhs != null) expr.rhs.accept(this, level);
-		//TODO: error checking
 	}
 
 	public void visit(IfExpr expr, int level) {
@@ -247,29 +250,76 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		else if (functionType.type != Type.INT) {
 			printerr(expr.row, expr.column, "return statement inside void function");
 		} //and i guess we dont have to check if the return type matches cuz theres only two types 💀
+		hasReturned = true;
 	}
 
 	public void visit(CallExpr expr, int level) {
-		int countedArgs = 0;
-		ExprList arglist = expr.args;
-		ArrayList<NodeType> fsong = this.table.get(expr.name);
+		ArrayList<NodeType> fsong = this.table.get(expr.func);
 		if (fsong != null) {
-			FunctionDecl def = fsong.stream().filter(e -> e.name.equals(fsong.name)).findFirst().orElse(null);
-			while(arglist != null) {
-				if (arglist.head != null) {
-					countedArgs += 1;
+			NodeType def = fsong.stream().filter(e -> e.name.equals(expr.func)).findFirst().orElse(null);
+			if (def == null && !pain.containsKey(expr.func)) {
+				printerr(expr.row, expr.column, "function " + expr.func + " is not defined");
+			} 
+			else {
+				int countedArgs = 0;
+				ExprList arglist = expr.args;
+				ArrayList<Type> types = new ArrayList<Type>(); //they all gotta be int but idc
+				if (def != null || pain.containsKey(expr.func)) {
+					FunctionDecl downcastingmemeStrikesAgain;
+					if (def != null) downcastingmemeStrikesAgain = (FunctionDecl)(def.def);
+					else downcastingmemeStrikesAgain = pain.get(expr.func);
+					VarDeclList expectedParams = downcastingmemeStrikesAgain.params;
+					while(expectedParams != null) {
+						if (expectedParams.head != null) {
+							types.add(expectedParams.head.type);
+						}
+						expectedParams = expectedParams.tail;
+					}
+					while(arglist != null) {
+						if (arglist.head != null) {
+							countedArgs += 1;
+						}
+						arglist = arglist.tail;
+					} //TODO: check param count and function existence
+					if (countedArgs != (types.size())) {
+						printerr(expr.row, expr.column, "incorrect number of arguments provided to " + expr.func + " (expected " + Integer.toString(types.size()) + ", got " + Integer.toString(countedArgs));
+					}
 				}
-				arglist = arglist.tail;
-			} //TODO: check param count and function existence
+				else {
+					printerr(expr.row, expr.column, "function " + expr.func + " is not defined");
+				}
+			}
+		}
 		else {
-			printerr(expr.row, expr.column, "function " + expr.name + " is not defined")
+			printerr(expr.row, expr.column, "function " + expr.func + " is not defined");
 		}
 		if (expr.args != null) {
 			expr.args.accept(this, level);
 		}
 	}
-	
 
+	private FunctionDecl isFunctionDefined(String id) {
+		ArrayList<NodeType> fug = this.table.get(id);
+		NodeType def = null;
+		if (fug != null) def = fug.stream().filter(e -> e.name.equals(id)).findFirst().orElse(null);
+		if (fug != null && def != null) {
+			return (FunctionDecl)(def.def);
+		}
+		else { //we can also check pain
+			return pain.get(id);
+		}
+	}
+
+	private boolean isFunctionDefinedAndIntReturning(String id) {
+		FunctionDecl gg = isFunctionDefined(id);
+		if (gg != null) {
+			if (gg.result.type == Type.INT) {
+				return true;
+			}
+			return false;
+		}
+		return false;
+	}
 
 	public void visit(SimpleDecl expr, int level) {
 		if (expr.type.type == Type.VOID) {
@@ -307,7 +357,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			}
 			expr.body.accept(this, level);
 			functionType = null;
-			if (!hasReturned && expr.result.type.type == Type.INT) {
+			if (!hasReturned && (expr.result.type == Type.INT)) {
 				printerr(expr.row, expr.column, "integer-promising function missing a return value");
 			}
 			level = declevel(level);
@@ -318,12 +368,14 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	private int ERRNOTFOUND(int row, int col, String offending) {
-		printerr(row, col, "var or function " + offending + " not found or inaccessible.");
+		if (!pain.containsKey(offending))
+			printerr(row, col, "var or function " + offending + " not found or inaccessible.");
 		return NOTFOUND;
 	}
 
 	private int ERRREDEFINED(int row, int col, String offending) {
-		printerr(row, col, "var or function " + offending + " redefined in an identical scope");
+		if (!pain.containsKey(offending))
+			printerr(row, col, "var or function " + offending + " redefined in an identical scope");
 		return NOTFOUND;
 	}
 
@@ -388,16 +440,13 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			else return false;
 		}
 		else if (expr instanceof CallExpr) {
-			String name = ((CallExpr)expr).func;
-			ArrayList<NodeType> god = this.table.get(name);
-			NodeType jankYe = null;
-			if (god != null) jankYe = god.stream().filter(e -> e.name.equals(name)).findFirst().orElse(null);
-			if (jankYe == null) { //NOTE: could probably have used determineexistence but it 5am idrc
-				ERRNOTFOUND(((CallExpr)expr).row, ((CallExpr)expr).column, name);
-				return false;
+			FunctionDecl called = isFunctionDefined(((CallExpr)(expr)).func);
+			if (called != null) {
+				return (called.result.type == Type.INT);
 			}
 			else {
-				return jankYe.def.type.type == Type.INT;
+				ERRNOTFOUND(expr.row, expr.column, ((CallExpr)(expr)).func);
+				return false;
 			}
 		}
 		else if (expr instanceof OpExpr) {
