@@ -2,12 +2,11 @@ import absyn.*;
 
 import java.util.HashMap;
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicInteger; //hate
+import java.util.Iterator; //because .forEach was a worse mistake than the mars orbiter
 
 public class SemanticAnalyzer implements AbsynVisitor {
 
 	final static int SPACES = 4;
-
 	final static int SIMPLE = 0;
 	final static int ARRAY = 1;
 	final static int FUNCTION = 2;
@@ -17,6 +16,48 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	public SemanticAnalyzer(StringBuilder lol) {
 		this.table = new HashMap<String, ArrayList<NodeType>>(); //I WILL NEVER STRAY FROM THE PLAN OF FEI
 		this.builder = lol; 								     //OOOHHHH IM VISITINGGGGG
+		int[] startOfProg = {0, 0};
+		NodeType inputNode = new NodeType("input", 
+												new FunctionDecl(startOfProg, 
+													new Type(startOfProg, Type.INT), "input",
+														new VarDeclList(null, null),
+													new BlockExpr(startOfProg, null, null)),
+													0);
+		NodeType outputNode = new NodeType("output", 
+												new FunctionDecl(startOfProg, 
+													new Type(startOfProg, Type.VOID), "output", 
+														new VarDeclList(new SimpleDecl(startOfProg, new Type(startOfProg, Type.INT), "x"), null), 
+													new BlockExpr(startOfProg, null, null)),
+													0);
+		ArrayList<NodeType> inputForTable = new ArrayList<NodeType>();
+		ArrayList<NodeType> outputForTable = new ArrayList<NodeType>();
+		inputForTable.add(inputNode);
+		outputForTable.add(outputNode);
+		this.table.put("input", inputForTable);
+		this.table.put("output", outputForTable);
+	}
+
+	private int inclevel(int level) {
+		//testindent(level, "increasing level from " + Integer.toString(level));
+		return level+1;
+	}
+	private int declevel(int level) {
+		//testindent(level, "decreasing level from " + Integer.toString(level));
+		return level-1;
+	}
+
+	private void testindent(int level, String msg) {
+		printindent(level);
+		System.out.println(msg);
+	}
+
+	private void fileprint(int level, String msg) {
+		indent(level);
+		this.builder.append(msg + "\n");
+	}
+
+	private void printindent(int level) {
+		for(int i = 0; i < level * SPACES; i++) System.out.print(" ");
 	}
 
 	private void indent(int level) {
@@ -30,6 +71,69 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		if (scuffed != null) { //if hashmap.put returns a value other than null, then that value already existed in the map.
 			scuffed.add(toPush);
 		} //thats why i named this variable "scuffed". thank u so much for this horrid plan
+	}
+
+	private void analyze(int currentLevel) {
+		Iterator<ArrayList<NodeType>> hashMapIterator = this.table.values().iterator();
+		while(hashMapIterator.hasNext()) {
+			boolean toRemove = false;
+			ArrayList<Integer> removalList = new ArrayList<Integer>();
+			ArrayList<NodeType> currentID = hashMapIterator.next(); 
+			Iterator<NodeType> nodeIterator = currentID.iterator();
+			while(nodeIterator.hasNext()) {
+				NodeType node = nodeIterator.next();
+				//testindent(currentLevel, "node: " + node.name + ", nodelevel: " + Integer.toString(node.level) + " vs currentLevel: " + Integer.toString(currentLevel)); 
+				if (node.level == currentLevel) {
+					toRemove = true;
+					if (node.def instanceof FunctionDecl) {
+						FunctionDecl javasucks = (FunctionDecl)(node.def);
+						StringBuilder paramMaker = new StringBuilder();
+						VarDeclList p = javasucks.params;
+						VarDecl endingone = new SimpleDecl(new int[]{99969, 999420}, null, null); //i dont care any more
+						while(p != null) {
+							if (p.head != null) {
+								endingone = p.head;
+								if (p.head instanceof ArrayDecl) {
+									ArrayDecl downcastingMeme = (ArrayDecl)(p.head);
+									paramMaker.append(downcastingMeme.type.getTypeName() + "[], ");
+								}
+								else {
+									SimpleDecl romaRomama = (SimpleDecl)(p.head);
+									paramMaker.append(romaRomama.type.getTypeName() + ", ");
+								}
+							}
+							p = p.tail;
+						}
+						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - ((endingone instanceof SimpleDecl) ? 2 : 4), 0)); //to remove the extra ", " but not provide substring with a bad arg
+						testindent(currentLevel, node.name + ": (" + paramTypes + ") -> " + javasucks.result.getTypeName());
+					}
+					else if (node.def instanceof ArrayDecl) {
+						ArrayDecl javabad = (ArrayDecl)(node.def);
+						String sizeStr;
+						if (javabad.size == null) {
+							sizeStr = "";
+						}
+						else {
+							sizeStr = Integer.toString(javabad.size.value);
+						}
+						testindent(currentLevel, node.name + "[" + sizeStr + "]: " + javabad.type.getTypeName() ); //FIXME: uh?
+						//should only be an integer really, but hehehehehehehe
+					}
+					else if (node.def instanceof SimpleDecl) {
+						SimpleDecl javajank = (SimpleDecl)(node.def); //still need to downcast because fuck me ig
+						testindent(currentLevel, node.name + ": " + javajank.type.getTypeName());
+					}
+					else {
+						System.err.println("The definition of node " + node.name + " is invalid or empty!");
+						//then shit your pants ig
+					} //SOOO UNNECESSARY
+				}
+			}
+			//then, if it was found, remove the element. (this is called at the end of any scope)
+			if (toRemove) {
+				currentID.remove(currentID.size() - 1); //remove the most recently defined id
+			}
+		}
 	}
 
 	public void visit(ExprList expr, int level) {
@@ -51,12 +155,17 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(DeclList expr, int level) {
+		testindent(level, "Entering the global scope");
+		level = inclevel(level);
 		while(expr != null) {
 			if (expr.head != null) {
 				expr.head.accept(this, level);
 			}
 			expr = expr.tail;
 		}
+		level = declevel(level);
+		analyze(level);
+		testindent(level, "Exiting the global scope");
 	}
 
 	public void visit(VarExpr expr, int level) {
@@ -95,73 +204,19 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		}
 	}
 
-	public void visit(BlockExpr expr, int level) {
-		//level++; //we scopin
-		if (expr.decls != null) {
-			expr.decls.accept(this, level);
+	public void visit(BlockExpr expr, int level) { //a nice toString override could REALLY simplify this code but I'm strictly following fei song's advice for the meme
+		if (expr.exprs != null || expr.decls != null) {
+			testindent(level, "Entering a block");
+			level = inclevel(level);
+			if (expr.decls != null)
+				expr.decls.accept(this, level);
+			if (expr.exprs != null)
+				expr.exprs.accept(this, level);
+			level = declevel(level);
+			analyze(level);
+			testindent(level, "Leaving a block");
 		}
-		if (expr.exprs != null) {
-			expr.exprs.accept(this, level);
-		}
-		//level--;
-		//print all the relevant table info here because we have reached the end of the scope?
-		AtomicInteger currentLevel = new AtomicInteger(level);
-		this.table.forEach((k, v) -> {
-			v.forEach((node) -> {
-				System.out.println("nodelevel: " + Integer.toString(node.level) + "vs currentLevel: " + Integer.toString(currentLevel.get())); 
-				if (node.level == currentLevel.get()) {
-					if (node.def instanceof FunctionDecl) {
-						FunctionDecl javasucks = (FunctionDecl)(node.def);
-						indent(currentLevel.get());
-						StringBuilder paramMaker = new StringBuilder();
-						VarDeclList p = javasucks.params;
-						VarDecl endingone = new SimpleDecl(new int[]{99969, 999420}, null, null); //i dont care any more
-						while(p != null) {
-							if (p.head != null) {
-								endingone = p.head;
-								if (p.head instanceof ArrayDecl) {
-									ArrayDecl downcastingMeme = (ArrayDecl)(p.head);
-									paramMaker.append(downcastingMeme.type.getTypeName() + "[], ");
-								}
-								else {
-									SimpleDecl romaRomama = (SimpleDecl)(p.head);
-									paramMaker.append(romaRomama.type.getTypeName() + ", "); //FIXME: fuck it varies in length depending
-								}
-							}
-							p = p.tail;
-						}
-						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - ((endingone instanceof SimpleDecl) ? 2 : 4), 0)); //to remove the extra ", " but not provide substring with a bad arg
-						this.builder.append(Integer.toString(node.level) + " | " + node.name + ": (" + paramTypes + ") -> " + javasucks.result.getTypeName() + "\n");
-					}
-					else if (node.def instanceof ArrayDecl) {
-						ArrayDecl javabad = (ArrayDecl)(node.def);
-						indent(currentLevel.get());
-						String sizeStr;
-						if (javabad.size == null) {
-							sizeStr = "";
-						}
-						else {
-							sizeStr = Integer.toString(javabad.size.value);
-						}
-						this.builder.append(Integer.toString(node.level) + " | " + node.name + "[" + sizeStr + "]: " + javabad.type.getTypeName() + "\n"); //FIXME: uh?
-						//should only be an integer really, but hehehehehehehe
-					}
-					else if (node.def instanceof SimpleDecl) {
-						indent(currentLevel.get());
-						SimpleDecl javajank = (SimpleDecl)(node.def); //still need to downcast because fuck me ig
-						System.out.println(Integer.toString(javajank.row) + ", " + Integer.toString(javajank.column));
-						this.builder.append(Integer.toString(node.level) + " | " + node.name + ": " + javajank.type.getTypeName() + "\n");
-						//but really, should only be an integer, so...
-					}
-					else {
-						System.err.println("The definition of node " + node.name + " is invalid or empty!");
-						//then shit your pants ig
-					}
-				}
-			});
-		});
-
-		level--;
+		//print all the relevant table info here because we have reached the end of the scope
 	}
 
 	public void visit(ReturnExpr expr, int level) {
@@ -175,13 +230,11 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		if (expr.args != null) {
 			expr.args.accept(this, level);
 		}
-		//level++? here? no... cuz a function has a blockscope, right?
-		//anyways too bad the inheritance is fucked so i cant do a nice get from table
 		ArrayList lawl = this.table.get(expr.func);
 		if (lawl == null) {
 			//TODO: handle undef, param mismatch, etc
 		} else {
-			NodeType jank = (NodeType)lawl.get(0); //since function redefintions arent allowed, just take the first one.
+			//NodeType jank = (NodeType)lawl.get(0); //since function redefintions arent allowed, just take the first one.
 			//check assign etc
 		}
 		//TODO: this. this is a biggie with many error cases
@@ -210,11 +263,16 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	public void visit(FunctionDecl expr, int level) { //this mfer got some params n shit ig
 		NodeType thisNode = new NodeType(expr.name, expr, level);
 		push(thisNode);
-		if (expr.params != null) {
-			expr.params.accept(this, level);
-		}
 		if (expr.body != null){
+			testindent(level, "Entering function scope (" + expr.name + ")");
+			level = inclevel(level);
+			if (expr.params != null) {
+				expr.params.accept(this, level);
+			}
 			expr.body.accept(this, level);
+			level = declevel(level);
+			analyze(level);
+			testindent(level, "Leaving function scope (" + expr.name + ")");
 		}
 		//TODO: type and err checking.
 	}
