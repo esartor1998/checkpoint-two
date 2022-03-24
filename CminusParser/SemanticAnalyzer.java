@@ -45,6 +45,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public HashMap<String, FunctionDecl> pain = new HashMap<String, FunctionDecl>();
+	public HashMap<String, ArrayDecl> sortfix = new HashMap<String, ArrayDecl>();
 
 	private void printerr(int row, int col, String msg) {
 		System.err.println("Error on line " + Integer.toString(row) + ", col " + Integer.toString(col) + ": " + msg);
@@ -159,6 +160,18 @@ public class SemanticAnalyzer implements AbsynVisitor {
 				expr.head.accept(this, level);
 			}
 			expr = expr.tail;
+		}
+		Iterator<ArrayDecl> lawl = sortfix.values().iterator();
+		while(lawl.hasNext()) {
+			ArrayDecl glob = lawl.next();
+			String sizeStr;
+			if (glob.size == null) {
+				sizeStr = "";
+			}
+			else {
+				sizeStr = Integer.toString(glob.size.value);
+			}
+			fileprint(level, glob.name + "[" + sizeStr + "]: " + glob.type.getTypeName() );
 		}
 		Iterator<FunctionDecl> lmfao = pain.values().iterator();
 		while (lmfao.hasNext()) {
@@ -372,6 +385,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 				expr.size.value = 1;
 			}
 		}
+		if (level <= 1) sortfix.put(expr.name, expr);
 		NodeType thisNode = new NodeType(expr.name, expr, level);
 		push(thisNode);
 	}
@@ -421,6 +435,9 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			else { //this is so hilariously extra. god i hate this lang
 				NodeType match = tmp.stream().filter(e -> e.name.equals(fuck.name)).findFirst().orElse(null);
 				if (match == null) {
+					if (sortfix.containsKey(fuck.name)) {
+						return VERIFIED;
+					}
 					return ERRNOTFOUND(fuck.row, fuck.column, fuck.name);
 				}
 				else return VERIFIED;
@@ -429,10 +446,20 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		else {
 			IndexVar life = (IndexVar)id;
 			ArrayList<NodeType> tmp = this.table.get(life.name);
-			if (tmp == null) return ERRNOTFOUND(life.row, life.column, life.name);
+			if (tmp == null) {
+				if (sortfix.containsKey(life.name)) {
+					return VERIFIED;
+				}
+				return ERRNOTFOUND(life.row, life.column, life.name);
+			}
 			else { //this is so hilariously extra. god i hate this lang
 				NodeType match = tmp.stream().filter(e -> e.name.equals(life.name)).findFirst().orElse(null);
-				if (match == null) return ERRNOTFOUND(life.row, life.column, life.name);
+				if (match == null) {
+					if (sortfix.containsKey(life.name)) {
+						return VERIFIED;
+					}
+					return ERRNOTFOUND(life.row, life.column, life.name);
+				}
 				else return VERIFIED;
 			}
 		} //instanceofinstanceofinstanceofinstanceofinstanceofinstanceofinstanceofinstanceofinstanceof
