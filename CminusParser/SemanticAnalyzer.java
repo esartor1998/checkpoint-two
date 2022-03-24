@@ -112,12 +112,12 @@ public class SemanticAnalyzer implements AbsynVisitor {
 						else {
 							sizeStr = Integer.toString(javabad.size.value);
 						}
-						testindent(currentLevel, node.name + "[" + sizeStr + "]: " + javabad.type.getTypeName() ); //FIXME: uh?
+						fileprint(currentLevel, node.name + "[" + sizeStr + "]: " + javabad.type.getTypeName() );
 						//should only be an integer really, but hehehehehehehe
 					}
 					else if (node.def instanceof SimpleDecl) {
 						SimpleDecl javajank = (SimpleDecl)(node.def); //still need to downcast because fuck me ig
-						testindent(currentLevel, node.name + ": " + javajank.type.getTypeName());
+						fileprint(currentLevel, node.name + ": " + javajank.type.getTypeName());
 					}
 					else {
 						System.err.println("The definition of node " + node.name + " is invalid or empty!");
@@ -152,7 +152,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(DeclList expr, int level) {
-		testindent(level, "Entering the global scope");
+		fileprint(level, "Entering the global scope");
 		level = inclevel(level);
 		while(expr != null) {
 			if (expr.head != null) {
@@ -182,10 +182,10 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			}
 			String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - ((endingone instanceof SimpleDecl) ? 2 : 4), 0)); //to remove the extra ", " but not provide substring with a bad arg
 						
-			testindent(level, func.name + ": (" + paramTypes + ") -> " + func.result.getTypeName());
+			fileprint(level, func.name + ": (" + paramTypes + ") -> " + func.result.getTypeName());
 		}
 		level = declevel(level);
-		testindent(level, "Exiting the global scope");
+		fileprint(level, "Exiting the global scope");
 		//analyze(level);
 	}
 
@@ -302,7 +302,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 								if (arglist.head instanceof VarExpr) {
 									VarExpr cock = (VarExpr)arglist.head;
 									if (!(cock.variable instanceof IndexVar)) {
-										printerr(arglist.head.row, arglist.head.column, " expected array-type, but argument provided is not an array");
+										printerr(cock.row, cock.column, " expected array-type, but argument provided is not an array");
 									}
 								}
 							}
@@ -380,7 +380,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		NodeType thisNode = new NodeType(expr.name, expr, level);
 		push(thisNode);
 		if (expr.body != null){
-			testindent(level, "Entering function scope (" + expr.name + ")");
+			fileprint(level, "Entering function scope (" + expr.name + ")");
 			functionType = expr.result;
 			hasReturned = false;
 			level = inclevel(level);
@@ -393,7 +393,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 				printerr(expr.row, expr.column, "integer-promising function missing a return value");
 			}
 			level = declevel(level);
-			testindent(level, "Leaving function scope (" + expr.name + ")");
+			fileprint(level, "Leaving function scope (" + expr.name + ")");
 			analyze(level);
 		}
 		//TODO: type and err checking.

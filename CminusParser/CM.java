@@ -35,10 +35,6 @@ class CM {
 		try {
 			parser p = new parser(new Lexer(new FileReader(argv[argv.length - 1])));
 			Absyn result = (Absyn)(p.parse().value);
-			System.out.println("ra ra ra-a-a!\n"+Boolean.toString(SYM_TABLE) + " " + result.toString());
-			if (result == null) {
-				System.out.println("WHY are you nulling");
-			}
 			if (SHOW_TREE && result != null) {
 				StringBuilder hack = new StringBuilder();
 				ShowTreeVisitor visitor = new ShowTreeVisitor(hack);
@@ -48,7 +44,6 @@ class CM {
 				publicAwareStaticNotStaticReallyStringFactoryProducingHumanReadableOutput.close();
 			} //i hate "Java"
 			if (SYM_TABLE && result != null) {
-				System.out.println("roma, roma-ma");
 				StringBuilder tabele = new StringBuilder();
 				SemanticAnalyzer unwantedVisitor = new SemanticAnalyzer(tabele);
 				result.accept(unwantedVisitor, 0);

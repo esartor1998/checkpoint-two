@@ -70,41 +70,48 @@ num = [0-9]+
 //id defined as follows, except without the shorthand
 id = [_a-zA-Z][\w]*
 comment = \/\*[^\*]*[^\/]*\*\/
+%state COMMENT
 %%
 /* ------------------------Lexical Rules Section---------------------- */
 	
 /*This section contains regular expressions and actions, i.e. Java
 code, that will be executed when the scanner matches the associated
 regular expression. */
+<YYINITIAL> {
+	[\s\n\r]+            { /* skip whitespace */ }   
+	"if"                 { return symbol(sym.IF); }
+	"else"               { return symbol(sym.ELSE); }
+	"while"              { return symbol(sym.WHILE); }
+	"return"             { return symbol(sym.RETURN); }
+	"int"                { return symbol(sym.INT); }
+	"void"               { return symbol(sym.VOID); }
+	">="                 { return symbol(sym.GEQ); }
+	"<="                 { return symbol(sym.LEQ); }
+	"!="                 { return symbol(sym.NEQ); }
+	"=="                 { return symbol(sym.EQ); }
+	"="                  { return symbol(sym.ASSIGN); }
+	"<"                  { return symbol(sym.LT); }
+	">"                  { return symbol(sym.GT); }
+	"+"                  { return symbol(sym.PLUS); }
+	"-"                  { return symbol(sym.MINUS); }
+	"*"                  { return symbol(sym.TIMES); }
+	"/"                  { return symbol(sym.OVER); }
+	","                  { return symbol(sym.COMMA); }
+	"("                  { return symbol(sym.LPAREN); }
+	")"                  { return symbol(sym.RPAREN); }
+	"["                  { return symbol(sym.LBRACK); }
+	"]"                  { return symbol(sym.RBRACK); }
+	"{"                  { return symbol(sym.LBRACE); }
+	"}"                  { return symbol(sym.RBRACE); }
+	";"                  { return symbol(sym.SEMI); }
+	{num}                { return symbol(sym.NUM, yytext()); }
+	{id}                 { return symbol(sym.ID, yytext()); }
+	"/*"                 { yybegin(COMMENT); }
+	.                    { System.err.println("ERR: unrecognized/unexpected symbol \"" + yytext() + "\" on line " + yyline + " column " + yycolumn);
+						return symbol(sym.ERROR); }
+}
 
-[\s\n\r]+            { /* skip whitespace */ }   
-{comment}   		 { /* skip comments */ }
-"if"                 { return symbol(sym.IF); }
-"else"               { return symbol(sym.ELSE); }
-"while"              { return symbol(sym.WHILE); }
-"return"             { return symbol(sym.RETURN); }
-"int"                { return symbol(sym.INT); }
-"void"               { return symbol(sym.VOID); }
-">="                 { return symbol(sym.GEQ); }
-"<="                 { return symbol(sym.LEQ); }
-"!="                 { return symbol(sym.NEQ); }
-"=="                 { return symbol(sym.EQ); }
-"="                  { return symbol(sym.ASSIGN); }
-"<"                  { return symbol(sym.LT); }
-">"                  { return symbol(sym.GT); }
-"+"                  { return symbol(sym.PLUS); }
-"-"                  { return symbol(sym.MINUS); }
-"*"                  { return symbol(sym.TIMES); }
-"/"                  { return symbol(sym.OVER); }
-","                  { return symbol(sym.COMMA); }
-"("                  { return symbol(sym.LPAREN); }
-")"                  { return symbol(sym.RPAREN); }
-"["                  { return symbol(sym.LBRACK); }
-"]"                  { return symbol(sym.RBRACK); }
-"{"                  { return symbol(sym.LBRACE); }
-"}"                  { return symbol(sym.RBRACE); }
-";"                  { return symbol(sym.SEMI); }
-{num}                { return symbol(sym.NUM, yytext()); }
-{id}                 { return symbol(sym.ID, yytext()); }
-.                    { System.err.println("ERR: unrecognized/unexpected symbol \"" + yytext() + "\" on line " + yyline + " column " + yycolumn);
-					   return symbol(sym.ERROR); }
+<COMMENT> {
+	"*/" { yybegin(YYINITIAL); }
+	[^]  { }
+}

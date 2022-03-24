@@ -11,18 +11,28 @@ int lcm(int m, int n) {
 	return m / gcd(m, n) * n;
 }
  
+void f1(void) {
+
+}
+
+void f2(void) {
+
+}
+
 void main(void) {
-	int m; int n; int num; int lol;
+	int a; int b; int m; int n; int num; int lol; int test[50];
 	/* language doesnt support strings so can't prompt user LOL */
 	m = input();
 	n = input();
-	output(m, n, lcm(m, n));
-
+	output(lcm(m, n));
+	a = test[42];
+	test[43] = b;
 	/* more testing */
 	if (5 + 2 * 3 - 7 >= 5 + 2 * (3 - 7)) {
 		lol = 5 - 3 * 4 / 7 + 6;
-		test[43] = lol;
+		test[a > b] = lol;
 	}
-	num = output((input(test[44])));
+	
+	output((input()));
 	if (a) if (b) f1(); else f2(); /*dangling else test*/
 }

@@ -9,7 +9,7 @@ void f2(void) {
 }
 
 void main(void) {
-	int year; char fence1; char endfences; char fence3[2];
+	int year; int fence1; int endfences; int fence3[0];
 	year = input();
 
 	/* leap year if perfectly divisible by 400 */
