@@ -164,23 +164,23 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		while (lmfao.hasNext()) {
 			FunctionDecl func = lmfao.next();
 			StringBuilder paramMaker = new StringBuilder();
-						VarDeclList p = func.params;
-						VarDecl endingone = new SimpleDecl(new int[]{99969, 999420}, null, null); //i dont care any more
-						while(p != null) {
-							if (p.head != null) {
-								endingone = p.head;
-								if (p.head instanceof ArrayDecl) {
-									ArrayDecl downcastingMeme = (ArrayDecl)(p.head);
-									paramMaker.append(downcastingMeme.type.getTypeName() + "[], ");
-								}
-								else {
-									SimpleDecl romaRomama = (SimpleDecl)(p.head);
-									paramMaker.append(romaRomama.type.getTypeName() + ", ");
-								}
-							}
-							p = p.tail;
-						}
-						String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - ((endingone instanceof SimpleDecl) ? 2 : 4), 0)); //to remove the extra ", " but not provide substring with a bad arg
+			VarDeclList p = func.params;
+			VarDecl endingone = new SimpleDecl(new int[]{99969, 999420}, null, null); //i dont care any more
+			while(p != null) {
+				if (p.head != null) {
+					endingone = p.head;
+					if (p.head instanceof ArrayDecl) {
+						ArrayDecl downcastingMeme = (ArrayDecl)(p.head);
+						paramMaker.append(downcastingMeme.type.getTypeName() + "[], ");
+					}
+					else {
+						SimpleDecl romaRomama = (SimpleDecl)(p.head);
+						paramMaker.append(romaRomama.type.getTypeName() + ", ");
+					}
+				}
+				p = p.tail;
+			}
+			String paramTypes = paramMaker.substring(0, Math.max(paramMaker.length() - ((endingone instanceof SimpleDecl) ? 2 : 4), 0)); //to remove the extra ", " but not provide substring with a bad arg
 						
 			testindent(level, func.name + ": (" + paramTypes + ") -> " + func.result.getTypeName());
 		}
@@ -279,7 +279,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			else {
 				int countedArgs = 0;
 				ExprList arglist = expr.args;
-				ArrayList<Type> types = new ArrayList<Type>(); //they all gotta be int but idc
+				ArrayList<Boolean> types = new ArrayList<Boolean>(); //they all gotta be int but idc
 				if (def != null || pain.containsKey(expr.func)) {
 					FunctionDecl downcastingmemeStrikesAgain;
 					if (def != null) downcastingmemeStrikesAgain = (FunctionDecl)(def.def);
@@ -287,12 +287,25 @@ public class SemanticAnalyzer implements AbsynVisitor {
 					VarDeclList expectedParams = downcastingmemeStrikesAgain.params;
 					while(expectedParams != null) {
 						if (expectedParams.head != null) {
-							types.add(expectedParams.head.type);
+							if (expectedParams.head instanceof ArrayDecl){
+								types.add(true);
+							}
+							else {
+								types.add(false);
+							}
 						}
 						expectedParams = expectedParams.tail;
 					}
 					while(arglist != null) {
 						if (arglist.head != null) {
+							if (types.get((Math.min(countedArgs,  types.size() - 1)))) {
+								if (arglist.head instanceof VarExpr) {
+									VarExpr cock = (VarExpr)arglist.head;
+									if (!(cock.variable instanceof IndexVar)) {
+										printerr(arglist.head.row, arglist.head.column, " expected array-type, but argument provided is not an array");
+									}
+								}
+							}
 							countedArgs += 1;
 						}
 						arglist = arglist.tail;
@@ -353,9 +366,11 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			expr.type.type = Type.INT;
 		}
 		//if (checkIndex()); nvm on second thought no need to check index resolves to int cuz its forced to be by syntax
-		if (expr.size.value <= 0) {
-			printerr(expr.row, expr.column, "invalid size for array, changing to 1");
-			expr.size.value = 1;
+		if (expr.size != null) {
+			if (expr.size.value <= 0) {
+				printerr(expr.row, expr.column, "invalid size for array, changing to 1");
+				expr.size.value = 1;
+			}
 		}
 		NodeType thisNode = new NodeType(expr.name, expr, level);
 		push(thisNode);
@@ -401,13 +416,11 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			SimpleVar fuck = (SimpleVar)id;
 			ArrayList<NodeType> tmp = this.table.get(fuck.name);
 			if (tmp == null) {
-				System.out.println("rootcause");
 				return ERRNOTFOUND(fuck.row, fuck.column, fuck.name);
 			}
 			else { //this is so hilariously extra. god i hate this lang
 				NodeType match = tmp.stream().filter(e -> e.name.equals(fuck.name)).findFirst().orElse(null);
 				if (match == null) {
-					System.out.println("rootcause2");
 					return ERRNOTFOUND(fuck.row, fuck.column, fuck.name);
 				}
 				else return VERIFIED;
