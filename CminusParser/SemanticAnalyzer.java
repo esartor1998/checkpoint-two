@@ -94,6 +94,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			ArrayList<NodeType> currentID = hashMapIterator.next(); 
 			Iterator<NodeType> nodeIterator = currentID.iterator();
 			while(nodeIterator.hasNext()) {
+				toRemove = false;
 				NodeType node = nodeIterator.next();
 				//testindent(currentLevel, "node: " + node.name + ", nodelevel: " + Integer.toString(node.level) + " vs currentLevel: " + Integer.toString(currentLevel)); 
 				if (node.level == currentLevel) {
@@ -126,6 +127,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			}
 			//then, if it was found, remove the element. (this is called at the end of any scope)
 			if (toRemove) {
+				//testindent(level, "removing " + currentID.get(currentID.size() - 1).name + " from tbale");
 				currentID.remove(currentID.size() - 1); //remove the most recently defined id
 			}
 		}
@@ -194,9 +196,11 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(OpExpr expr, int level) {
+		if (!checkIndex(expr.left) || !checkIndex(expr.right)) {
+			printerr(expr.row, expr.column, "non-integer-resolving operand in opexpr");
+		}
 		expr.left.accept(this, level);
 		expr.right.accept(this, level);
-		//TODO: error checking
 	}
 
 	public void visit(AssignExpr expr, int level) {
@@ -208,20 +212,32 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(IfExpr expr, int level) {
+		if (!checkIndex(expr.test)) {
+			printerr(expr.row, expr.column, "test condition is not integer-resolving");
+		}
 		expr.test.accept(this, level);
+		level = inclevel(level);
 		expr.thenpart.accept(this, level);
+		level = declevel(level);
 		if (expr.elsepart != null) {
 			expr.elsepart.accept(this, level);
 		}
 	}
 
 	public void visit(WhileExpr expr, int level) {
-		//TODO: error checking
 		if (expr.test != null) {
 			expr.test.accept(this, level);
+			if (!checkIndex(expr.test)) {
+				printerr(expr.row, expr.column, "test condition is not integer-resolving");
+			}
+		}
+		else {
+			printerr(expr.row, expr.column, "null or invalid while test expr");
 		}
 		if (expr.body != null) {
+			level = inclevel(level);
 			expr.body.accept(this, level);
+			level = declevel(level);
 		}
 	}
 
@@ -280,9 +296,9 @@ public class SemanticAnalyzer implements AbsynVisitor {
 							countedArgs += 1;
 						}
 						arglist = arglist.tail;
-					} //TODO: check param count and function existence
+					}
 					if (countedArgs != (types.size())) {
-						printerr(expr.row, expr.column, "incorrect number of arguments provided to " + expr.func + " (expected " + Integer.toString(types.size()) + ", got " + Integer.toString(countedArgs));
+						printerr(expr.row, expr.column, "incorrect number of arguments provided to " + expr.func + " (expected " + Integer.toString(types.size()) + ", got " + Integer.toString(countedArgs) + ")");
 					}
 				}
 				else {
@@ -326,6 +342,7 @@ public class SemanticAnalyzer implements AbsynVisitor {
 			printerr(expr.row, expr.column, "void type variable declaration. Changing to int");
 			expr.type.type = Type.INT;
 		}
+		//System.out.println("adding " + expr.name + " to table");
 		NodeType thisNode = new NodeType(expr.name, expr, level);
 		push(thisNode);
 	}
@@ -383,10 +400,16 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		if (id instanceof SimpleVar) {
 			SimpleVar fuck = (SimpleVar)id;
 			ArrayList<NodeType> tmp = this.table.get(fuck.name);
-			if (tmp == null) return ERRNOTFOUND(fuck.row, fuck.column, fuck.name);
+			if (tmp == null) {
+				System.out.println("rootcause");
+				return ERRNOTFOUND(fuck.row, fuck.column, fuck.name);
+			}
 			else { //this is so hilariously extra. god i hate this lang
 				NodeType match = tmp.stream().filter(e -> e.name.equals(fuck.name)).findFirst().orElse(null);
-				if (match == null) return ERRNOTFOUND(fuck.row, fuck.column, fuck.name);
+				if (match == null) {
+					System.out.println("rootcause2");
+					return ERRNOTFOUND(fuck.row, fuck.column, fuck.name);
+				}
 				else return VERIFIED;
 			}
 		}
@@ -431,13 +454,24 @@ public class SemanticAnalyzer implements AbsynVisitor {
 		}
 		else if (expr instanceof VarExpr) {
 			VarExpr haha = (VarExpr)expr;
-			ArrayList<NodeType> god = this.table.get(haha.variable.name);
+			String varname;
+			if (haha.variable instanceof SimpleVar) {
+				SimpleVar hatred = (SimpleVar)(haha.variable);
+				varname = hatred.name;
+			}
+			else {
+				IndexVar gr = (IndexVar)(haha.variable);
+				varname = gr.name;
+			} //hate this downcasting meme
+			ArrayList<NodeType> god = this.table.get(varname);
 			NodeType doubleErrSkeetAroundUsingDetermineExistence = null;
-			if (god != null) doubleErrSkeetAroundUsingDetermineExistence = god.stream().filter(e -> e.name.equals(haha.variable.name)).findFirst().orElse(null);
+			if (god != null) doubleErrSkeetAroundUsingDetermineExistence = god.stream().filter(e -> e.name.equals(varname)).findFirst().orElse(null);
 			if (doubleErrSkeetAroundUsingDetermineExistence != null) {
 				return true;
 			}
-			else return false;
+			else {
+				return false;
+			} 
 		}
 		else if (expr instanceof CallExpr) {
 			FunctionDecl called = isFunctionDefined(((CallExpr)(expr)).func);
@@ -456,12 +490,15 @@ public class SemanticAnalyzer implements AbsynVisitor {
 	}
 
 	public void visit(IndexVar expr, int level) { //printing the size of the array will be a fuckfest
-		int isntRedef = determineRedefinition(expr, level);
 		if (expr.index != null) {
 			if(!checkIndex(expr.index)) {
 				printerr(expr.row, expr.column, "non-integer-resolving array dereference");
 			}
 			expr.index.accept(this, level);
+		}
+		int isntRedef;
+		if (expr != null) {
+			isntRedef = determineRedefinition(expr, level);
 		}
 	}
 
